@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "BJuz1FGmmN8=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\wisie\\source\\repos\\XSDe\\XSDe\\XSDe.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\wisie\\.nuget\\packages\\microsoft.aspnetcore.app.internal.assets\\10.0.11\\microsoft.aspnetcore.app.internal.assets.10.0.11.nupkg.sha512"
+  ],
+  "logs": []
+}
