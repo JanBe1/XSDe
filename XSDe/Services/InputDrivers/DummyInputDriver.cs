@@ -1,15 +1,13 @@
 ﻿using XSDe.Models.Records;
 using XSDe.Services.InputDrivers.Interfaces;
 
-namespace XSDe.Services
+namespace XSDe.Services.InputDrivers
 {
     /// <summary>
     /// DummyInputDriver class implements the IInputDriver interface and provides a dummy implementation for testing purposes.
     /// </summary>
     public class DummyInputDriver : IInputDriver
     {
-        public bool IsAvailable => true;
-
         public ControllerSnapshot Poll() => new(
             IsConnected: false,
             PressedButtons: [],
