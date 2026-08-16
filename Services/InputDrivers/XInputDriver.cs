@@ -23,6 +23,7 @@ namespace XSDe.Services.InputDrivers
         /// <inheritdoc/>
         public ControllerSnapshot Poll()
         {
+            // no state: not connected
             if (!XInput.GetState(userIndex, out var state))
             {
                 _lastKnownConnected = false;
