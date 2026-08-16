@@ -1,4 +1,6 @@
-﻿using XSDe.Models.Records;
+﻿using Vortice.XInput;
+using XSDe.Models.Enums;
+using XSDe.Models.Records;
 
 namespace XSDe.Services.InputDrivers.Interfaces
 {

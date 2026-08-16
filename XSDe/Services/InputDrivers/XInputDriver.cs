@@ -2,6 +2,7 @@
 using Vortice.XInput;
 using XSDe.Models.Enums;
 using XSDe.Models.Records;
+using System.Runtime.CompilerServices;
 
 namespace XSDe.Services.InputDrivers
 {
@@ -29,9 +30,31 @@ namespace XSDe.Services.InputDrivers
                 _lastKnownConnected = false;
                 return new ControllerSnapshot(false, [], 0, 0, 0, 0, 0, 0);
             }
+            Gamepad gp = state.Gamepad;
 
             _lastKnownConnected = true;
-            Gamepad gp = state.Gamepad;
+            var pressed = MapButtons(state.Gamepad);
+
+            return new ControllerSnapshot(
+                IsConnected: _lastKnownConnected,
+                PressedButtons: pressed,
+                LeftThumbX: gp.LeftThumbX,
+                LeftThumbY: gp.LeftThumbY,
+                RightThumbX: gp.RightThumbX,
+                RightThumbY: gp.RightThumbY,
+                LeftTrigger: gp.LeftTrigger,
+                RightTrigger: gp.RightTrigger
+            );
+        }
+
+        /// <summary>
+        /// MapButtons method maps the pressed buttons from the Gamepad state to a HashSet of XButton enums.
+        /// </summary>
+        /// <param name="gp">The Gamepad state.</param>
+        /// <returns>A HashSet of pressed XButton enums.</returns>
+        public static HashSet<XButton> MapButtons(Gamepad gp)
+        {
+            
             var pressed = new HashSet<XButton>();
 
             void MapIf(GamepadButtons flag, XButton mapped)
@@ -42,7 +65,6 @@ namespace XSDe.Services.InputDrivers
                 }
             }
 
-            // Map the buttons from GamepadButtons to XButton
             MapIf(GamepadButtons.A, XButton.A);
             MapIf(GamepadButtons.B, XButton.B);
             MapIf(GamepadButtons.X, XButton.X);
@@ -61,18 +83,7 @@ namespace XSDe.Services.InputDrivers
             // Check triggers separately since they are analog inputs
             if (gp.LeftTrigger > TriggerThreshold) pressed.Add(XButton.LeftTrigger);
             if (gp.RightTrigger > TriggerThreshold) pressed.Add(XButton.RightTrigger);
-
-            return new ControllerSnapshot(
-                IsConnected: _lastKnownConnected,
-                PressedButtons: pressed,
-                LeftThumbX: gp.LeftThumbX,
-                LeftThumbY: gp.LeftThumbY,
-                RightThumbX: gp.RightThumbX,
-                RightThumbY: gp.RightThumbY,
-                LeftTrigger: gp.LeftTrigger,
-                RightTrigger: gp.RightTrigger
-            );
+            return pressed;
         }
-
     }
 }
