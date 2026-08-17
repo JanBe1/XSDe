@@ -13,7 +13,7 @@ namespace XSDe.Tests.TestCases
         [InlineData(-1, false)]
         [InlineData(0, false)]
         [InlineData(1, true)]
-        public void LeftTrigger_UsesStrictThreshold(
+        public void Trigger_UsesStrictThreshold(
             int offset,
             bool expectedPressed)
         {
@@ -28,6 +28,27 @@ namespace XSDe.Tests.TestCases
             Assert.Equal(
                 expectedPressed,
                 result.Contains(XButton.LeftTrigger));
+        }
+
+        [Theory]
+        [InlineData(-1, false)]
+        [InlineData(0, false)]
+        [InlineData(1, true)]
+        public void RightTrigger_UsesStrictThreshold(
+            int offset,
+            bool expectedPressed)
+        {
+            byte value = (byte)(Gamepad.TriggerThreshold + offset);
+            var gamepad = new Gamepad
+            {
+                RightTrigger = value
+            };
+
+            var result = XInputDriver.MapButtons(gamepad);
+
+            Assert.Equal(
+                expectedPressed,
+                result.Contains(XButton.RightTrigger));
         }
     }
 }
