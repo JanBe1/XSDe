@@ -1,6 +1,9 @@
 ﻿using System.Diagnostics;
+using XSDe.Models;
 using XSDe.Models.Enums;
 using XSDe.Models.Records;
+using XSDe.Services.ButtonMappingServices;
+using XSDe.Services.Executors;
 using XSDe.Services.InputDrivers.Interfaces;
 
 namespace XSDe.Services.BackgroundServices
@@ -11,7 +14,10 @@ namespace XSDe.Services.BackgroundServices
     /// <param name="driver">
     /// The input driver to poll for controller state.
     /// </param>
-    public class XInputDeckService(IInputDriver driver) : BackgroundService
+    /// <param name="mappingService">
+    /// The service responsible for mapping controller inputs to deck actions.
+    /// </param>
+    public class XInputDeckService(IInputDriver driver, IMappingService mappingService, IActionExecutor actionExecutor) : BackgroundService
     {
         /// <summary>
         /// Around 60Hz polling rate for XInput, which is approximately every 16 milliseconds.
@@ -31,8 +37,13 @@ namespace XSDe.Services.BackgroundServices
         /// <summary>
         /// Stores the timestamps of button presses to detect long presses and other input patterns.
         /// </summary>
-        private List<TimeSpan> _buttonPressTimestamps = new();
+        private Dictionary<XButton, TimeSpan> _buttonPressTimestamps = new();
 
+        /// <summary>
+        /// Executes the background service, continuously polling the input driver for controller state and processing the input for the deck.
+        /// </summary>
+        /// <param name="stoppingToken">The cancellation token to stop the background service.</param>
+        /// <returns></returns>
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
@@ -40,7 +51,8 @@ namespace XSDe.Services.BackgroundServices
                 // Poll the driver for controller state
                 _controllerSnapshot = driver.Poll();
                 // Process the snapshot and send input to the deck
-                ProcessSnapshot();
+                ProcessSnapshot(stoppingToken);
+                _previousSnapshot = _controllerSnapshot;
                 // Wait for a short interval before polling again
                 try
                 {
@@ -52,7 +64,6 @@ namespace XSDe.Services.BackgroundServices
                     break;
                 }
 
-                _previousSnapshot = _controllerSnapshot;
             }
         }
 
@@ -61,58 +72,43 @@ namespace XSDe.Services.BackgroundServices
         /// </summary>
         /// <param name="snapshot"></param>
         /// <exception cref="NotImplementedException"></exception>
-        private void ProcessSnapshot()
+        private void ProcessSnapshot(CancellationToken stoppingToken)
         {
-            if (this.PressedButtonsChanged(_controllerSnapshot, _previousSnapshot))
-            {
-                _buttonPressTimestamps.Add(DateTime.Now.TimeOfDay);
+            if (_controllerSnapshot is null || _previousSnapshot is null) return;
 
-                var stopwatch = new Stopwatch();
-                stopwatch.Start();
-                while (stopwatch.Elapsed < TimeSpan.FromMilliseconds(500))
+            var newlyPressed = _controllerSnapshot.PressedButtons
+                .Except(_previousSnapshot.PressedButtons);
+
+            foreach (var button in newlyPressed)
+            {
+                _buttonPressTimestamps[button] = DateTime.Now.TimeOfDay;
+            }
+
+            var newlyReleased = _previousSnapshot.PressedButtons
+                .Except(_controllerSnapshot.PressedButtons);
+
+            foreach (var button in newlyReleased)
+            {
+                if (_buttonPressTimestamps.TryGetValue(button, out var pressTime))
                 {
-                    if (this.PressedButtonsChanged(_controllerSnapshot, _previousSnapshot))
+                    var duration = (DateTime.Now.TimeOfDay - pressTime).TotalMilliseconds;
+
+                    // Fetch short-press default to check its threshold duration
+                    var baseMapping = mappingService.GetMapping(button, isLongPress: false);
+                    int threshold = baseMapping?.LongPressMilliseconds ?? 600;
+
+                    bool isLongPress = duration >= threshold;
+                    var mapping = mappingService.GetMapping(button, isLongPress: isLongPress);
+
+                    if (mapping is not null)
                     {
-                        _buttonPressTimestamps.Add(DateTime.Now.TimeOfDay);
-                        break;
+                        // Fire and forget non-blocking execution
+                        _ = actionExecutor.ExecuteAsync(mapping, stoppingToken);
                     }
-                    else
-                    {
-                        //long press detected, handle accordingly
-                    }
+
+                    _buttonPressTimestamps.Remove(button);
                 }
             }
-
-        }
-
-        private bool IsButtonPressed(XButton button, ControllerSnapshot snapshot)
-        {
-            return snapshot.PressedButtons.Contains(button);
-        }
-
-        private bool IsButtonReleased(XButton button, ControllerSnapshot snapshot)
-        {
-            return !snapshot.PressedButtons.Contains(button);
-        }
-
-        private bool ButtonStateChanged(XButton button, ControllerSnapshot currentSnapshot, ControllerSnapshot? previousSnapshot)
-        {
-            if (previousSnapshot is null)
-            {
-                return false;
-            }
-            bool wasPressed = previousSnapshot.PressedButtons.Contains(button);
-            bool isPressed = currentSnapshot.PressedButtons.Contains(button);
-            return wasPressed != isPressed;
-        }
-
-        private bool PressedButtonsChanged(ControllerSnapshot currentSnapshot, ControllerSnapshot? previousSnapshot)
-        {
-            if (previousSnapshot is null)
-            {
-                return false;
-            }
-            return !currentSnapshot.PressedButtons.SetEquals(previousSnapshot.PressedButtons);
         }
     }
 }
